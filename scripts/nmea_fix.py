@@ -6,11 +6,9 @@ import sys
 from nmea_msgs.msg import Sentence
 
 
-def nmea_collector():
+def nmea_collector(_ip, _port):
 
-    rospy.init_node('NMEA_fix')
-
-    client = setup_connection()
+    client = setup_connection(_ip, _port)
 
     pub = rospy.Publisher('nmea_fix_sentence', Sentence, queue_size=10)
 
@@ -28,12 +26,12 @@ def nmea_collector():
     rospy.spin()
 
 
-def setup_connection():
-    port = 4567
+def setup_connection(_ip, _port):
+    port = _port
+    ip = None
     attempts_limit = 10
     current_attempt = 0
     connected = False
-    ip = None
 
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -43,7 +41,7 @@ def setup_connection():
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.settimeout(5)
-            ip = socket.gethostbyname("192.168.1.100")
+            ip = socket.gethostbyname(_ip)
             address = (ip, port)
 
             rospy.loginfo("Attempting connection to %s:%s ", ip, port)
@@ -67,6 +65,11 @@ def setup_connection():
 
 if __name__ == '__main__':
     try:
-        nmea_collector()
+        rospy.init_node('NMEA_fix')
+        if not(2 < len(sys.argv) <= 3) or not str(sys.argv[1]).__contains__("ip:") or not str(sys.argv[2]).__contains__("port:"):
+            rospy.logwarn("Incorrect passing of arguments. Please try again using the following format: \n"
+                          "rosrun nmea_fix nmea_fix.py ip:xxx.xxx.xxx.xxx port:xxxxxx")
+        else:
+            nmea_collector(str(sys.argv[1]).split(":")[1], int(str(sys.argv[2]).split(":")[1]))
     except rospy.ROSInterruptException:
         pass
