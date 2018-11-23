@@ -30,7 +30,6 @@ def nmea_collector():
 
 def setup_connection():
     port = 4567
-    port = 53
     attempts_limit = 10
     current_attempt = 0
     connected = False
@@ -45,7 +44,6 @@ def setup_connection():
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.settimeout(5)
             ip = socket.gethostbyname("192.168.1.100")
-	    ip = socket.gethostbyname("192.168.43.114")
             address = (ip, port)
 
             rospy.loginfo("Attempting connection to %s:%s ", ip, port)
