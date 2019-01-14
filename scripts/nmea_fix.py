@@ -10,17 +10,21 @@ def nmea_collector(_ip, _port):
 
     client = setup_connection(_ip, _port)
 
-    pub = rospy.Publisher('nmea_fix_sentence', Sentence, queue_size=10)
+    pub = rospy.Publisher('nmea_sentence', Sentence, queue_size=10)
 
     nmea_sentence = Sentence()
 
     rate = rospy.Rate(100)
     rospy.loginfo("Starting data collection...")
     while not rospy.is_shutdown():
-        data = list(client.recv(1024).split('\r\n'))
-        nmea_sentence.sentence = data[0]
-        rospy.loginfo(nmea_sentence)
-        pub.publish(nmea_sentence)
+        try:
+            data = list(client.recv(1024).split('\r\n'))
+            nmea_sentence.sentence = data[0]
+            rospy.loginfo(nmea_sentence)
+            pub.publish(nmea_sentence)
+        except:
+            pass
+
         rate.sleep()
 
     rospy.spin()
