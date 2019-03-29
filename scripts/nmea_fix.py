@@ -6,24 +6,31 @@ import sys
 from nmea_msgs.msg import Sentence
 
 
-def nmea_collector(_ip, _port):
+def nmea_collector(ip , port):
 
-    client = setup_connection(_ip, _port)
+    client = setup_connection(ip , port)
 
-    pub = rospy.Publisher('nmea_sentence', Sentence, queue_size=10)
+    main_antenna_GGA_pub = rospy.Publisher('nmea/main_GGA', Sentence, queue_size=10)
+    secondary_antenna_GGA_pub = rospy.Publisher('nmea/secondary_GGA', Sentence, queue_size=10)
+    HRP_pub = rospy.Publisher('nmea/HRP', Sentence, queue_size=10)
 
-    nmea_sentence = Sentence()
+    main_GGA_sentence = Sentence()
+    HRP_sentence = Sentence()
+    secondary_GGA_sentence = Sentence()
 
     rate = rospy.Rate(100)
-    rospy.loginfo("Starting data collection...")
+    rospy.loginfo("Starting data retrieval...")
+
     while not rospy.is_shutdown():
-        try:
-            data = list(client.recv(1024).split('\r\n'))
-            nmea_sentence.sentence = data[0]
-            rospy.loginfo(nmea_sentence)
-            pub.publish(nmea_sentence)
-        except:
-            pass
+        GPS_data = list(client.recv(1024).split('\r\n'))
+
+        main_GGA_sentence.sentence = GPS_data[0]
+        HRP_sentence.sentence = GPS_data[1]
+        secondary_GGA_sentence.sentence = GPS_data[2]
+
+        main_antenna_GGA_pub.publish(main_GGA_sentence)
+        HRP_pub.publish(HRP_sentence)
+        secondary_antenna_GGA_pub.publish(secondary_GGA_sentence)
 
         rate.sleep()
 
@@ -69,7 +76,7 @@ def setup_connection(_ip, _port):
 
 if __name__ == '__main__':
     try:
-        rospy.init_node('NMEA_fix')
+        rospy.init_node('NMEA_parser')
         if not(2 < len(sys.argv) <= 3) or not str(sys.argv[1]).__contains__("ip:") or not str(sys.argv[2]).__contains__("port:"):
             rospy.logwarn("Incorrect passing of arguments. Please try again using the following format: \n"
                           "rosrun nmea_fix nmea_fix.py ip:xxx.xxx.xxx.xxx port:xxxxxx")
