@@ -6,31 +6,65 @@ import sys
 from nmea_msgs.msg import Sentence
 
 
+def create_publishers(GPS_data):
+    publishers = []
+    for i in range(0,len(GPS_data)):
+        if(str(GPS_data[i]).startswith("$GP")):
+            pub = rospy.Publisher(
+                                "nmea/" + str(GPS_data[i]).split(',')[0][3:len(str(GPS_data[i]).split(',')[0])],
+                                Sentence,
+                                queue_size=10
+                                )
+            publishers.append(pub)
+        else:
+            rospy.logerr("Could not create publishers. Incoming NMEA strings were in wrong format (sentencess must begin with \"$GP\").")
+            rospy.logwarn("Node shutting down.")
+            rospy.signal_shutdown("Incorrect NMEA input.")
+    return publishers
+
+
 def nmea_collector(ip , port):
-
     client = setup_connection(ip , port)
+    client.settimeout(0)
 
-    main_antenna_GGA_pub = rospy.Publisher('nmea/main_GGA', Sentence, queue_size=10)
-    secondary_antenna_GGA_pub = rospy.Publisher('nmea/secondary_GGA', Sentence, queue_size=10)
-    HRP_pub = rospy.Publisher('nmea/HRP', Sentence, queue_size=10)
+    #main_antenna_GGA_pub = rospy.Publisher('nmea/main_GGA', Sentence, queue_size=10)
+    #secondary_antenna_GGA_pub = rospy.Publisher('nmea/secondary_GGA', Sentence, queue_size=10)
+    #HRP_pub = rospy.Publisher('nmea/HRP', Sentence, queue_size=10)
 
-    main_GGA_sentence = Sentence()
-    HRP_sentence = Sentence()
-    secondary_GGA_sentence = Sentence()
+    #main_GGA_sentence = Sentence()
+    #HRP_sentence = Sentence()
+    #secondary_GGA_sentence = Sentence()
 
     rate = rospy.Rate(100)
     rospy.loginfo("Starting data retrieval...")
 
+    GPS_data = []
+    publishers = []
+
     while not rospy.is_shutdown():
-        GPS_data = list(client.recv(1024).split('\r\n'))
+        try:
+            GPS_data = list(client.recv(4096).split('\r\n'))
+        except:
+            pass
 
-        main_GGA_sentence.sentence = GPS_data[0]
-        HRP_sentence.sentence = GPS_data[1]
-        secondary_GGA_sentence.sentence = GPS_data[2]
+        if(len(publishers) == 0):
+            try:
+                publishers = create_publishers(GPS_data)
+            except:
+                pass
 
-        main_antenna_GGA_pub.publish(main_GGA_sentence)
-        HRP_pub.publish(HRP_sentence)
-        secondary_antenna_GGA_pub.publish(secondary_GGA_sentence)
+        for i in range(0,len(publishers)):
+            nmea_sentence = Sentence()
+            nmea_sentence.sentence = GPS_data[i]
+            publishers[i].publish(nmea_sentence)
+
+        #main_GGA_sentence.sentence = GPS_data[0] if len(GPS_data) >= 1  else ""
+        #HRP_sentence.sentence = GPS_data[1] if len(GPS_data) >= 2 else ""
+        #secondary_GGA_sentence.sentence = GPS_data[2] if len(GPS_data) >= 3 else ""
+
+        #main_antenna_GGA_pub.publish(main_GGA_sentence)
+        #HRP_pub.publish(HRP_sentence)
+        #secondary_antenna_GGA_pub.publish(secondary_GGA_sentence)
 
         rate.sleep()
 
