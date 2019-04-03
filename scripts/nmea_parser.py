@@ -17,23 +17,15 @@ def create_publishers(GPS_data):
                                 )
             publishers.append(pub)
         else:
-            rospy.logerr("Could not create publishers. Incoming NMEA strings were in wrong format (sentencess must begin with \"$GP\").")
+            rospy.logerr("Could not create publishers. Incoming NMEA strings were in wrong format (sentences must begin with \"$GP\").")
             rospy.logwarn("Node shutting down.")
             rospy.signal_shutdown("Incorrect NMEA input.")
     return publishers
 
 
-def nmea_collector(ip , port):
+def nmea_collector(ip, port):
     client = setup_connection(ip , port)
     client.settimeout(0)
-
-    #main_antenna_GGA_pub = rospy.Publisher('nmea/main_GGA', Sentence, queue_size=10)
-    #secondary_antenna_GGA_pub = rospy.Publisher('nmea/secondary_GGA', Sentence, queue_size=10)
-    #HRP_pub = rospy.Publisher('nmea/HRP', Sentence, queue_size=10)
-
-    #main_GGA_sentence = Sentence()
-    #HRP_sentence = Sentence()
-    #secondary_GGA_sentence = Sentence()
 
     rate = rospy.Rate(100)
     rospy.loginfo("Starting data retrieval...")
@@ -43,28 +35,34 @@ def nmea_collector(ip , port):
 
     while not rospy.is_shutdown():
         try:
-            GPS_data = list(client.recv(4096).split('\r\n'))
-        except:
+            GPS_data = list(client.recv(1024).split('\r\n'))
+        except socket.error as e:
+            if not e.errno == 11: #errorno 11 -> Resource temporarily unavailable
+                rospy.logerr(str(e))
             pass
 
         if(len(publishers) == 0):
             try:
                 publishers = create_publishers(GPS_data)
-            except:
+            except Exception as e:
+                rospy.logerr(str(e))
                 pass
 
-        for i in range(0,len(publishers)):
-            nmea_sentence = Sentence()
-            nmea_sentence.sentence = GPS_data[i]
-            publishers[i].publish(nmea_sentence)
-
-        #main_GGA_sentence.sentence = GPS_data[0] if len(GPS_data) >= 1  else ""
-        #HRP_sentence.sentence = GPS_data[1] if len(GPS_data) >= 2 else ""
-        #secondary_GGA_sentence.sentence = GPS_data[2] if len(GPS_data) >= 3 else ""
-
-        #main_antenna_GGA_pub.publish(main_GGA_sentence)
-        #HRP_pub.publish(HRP_sentence)
-        #secondary_antenna_GGA_pub.publish(secondary_GGA_sentence)
+        try:
+            for i in range(0,len(publishers)):
+                nmea_sentence = Sentence()
+                time = rospy.get_rostime()
+                nmea_sentence.header.stamp.secs = time.secs
+                nmea_sentence.header.stamp.nsecs = time.nsecs
+                nmea_sentence.sentence = GPS_data[i]
+                publishers[i].publish(nmea_sentence)
+        except Exception as e:
+            if (type(e) == type(IndexError())):
+                rospy.logerr("Stopped receiving data. \nError: %s", e)
+                rospy.logwarn("Node shutting down.")
+            else:
+                rospy.logerr(str(e))
+            rospy.signal_shutdown("")
 
         rate.sleep()
 
@@ -79,16 +77,14 @@ def setup_connection(_ip, _port):
     connected = False
 
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.settimeout(5)
+    ip = socket.gethostbyname(_ip)
+    address = (ip, port)
 
     while not connected and not rospy.is_shutdown() and current_attempt < attempts_limit:
         current_attempt += 1
 
         try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.settimeout(5)
-            ip = socket.gethostbyname(_ip)
-            address = (ip, port)
-
             rospy.loginfo("Attempting connection to %s:%s ", ip, port)
             client.connect(address)
 
@@ -102,7 +98,8 @@ def setup_connection(_ip, _port):
                           current_attempt, attempts_limit)
 
     if not connected:
-        rospy.logerr("No connection established. Node shutting down")
+        rospy.logerr("No connection established.")
+        rospy.logwarn("Node shutting down.")
         sys.exit()
 
     return client
@@ -113,7 +110,7 @@ if __name__ == '__main__':
         rospy.init_node('NMEA_parser')
         if not(2 < len(sys.argv) <= 3) or not str(sys.argv[1]).__contains__("ip:") or not str(sys.argv[2]).__contains__("port:"):
             rospy.logwarn("Incorrect passing of arguments. Please try again using the following format: \n"
-                          "rosrun nmea_fix nmea_fix.py ip:xxx.xxx.xxx.xxx port:xxxxxx")
+                          "rosrun nmea_parser nmea_parser.py ip:xxx.xxx.xxx.xxx port:xxxxx")
         else:
             nmea_collector(str(sys.argv[1]).split(":")[1], int(str(sys.argv[2]).split(":")[1]))
     except rospy.ROSInterruptException:
