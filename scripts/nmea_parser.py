@@ -8,10 +8,15 @@ from nmea_msgs.msg import Sentence
 
 def create_publishers(GPS_data):
     publishers = []
+    nmea_sentences = []
     for i in range(0,len(GPS_data)):
-        if(str(GPS_data[i]).startswith("$GP")):
+        if(str(GPS_data[i]).startswith("$")):
+           nmea_sentences.append(GPS_data[i])
+
+    for i in range(0,len(nmea_sentences)):
+        if(str(nmea_sentences[i]).startswith("$")):
             pub = rospy.Publisher(
-                                "nmea/" + str(GPS_data[i]).split(',')[0][3:len(str(GPS_data[i]).split(',')[0])],
+                                "nmea/" + str(nmea_sentences[i]).split(',')[0][3:len(str(nmea_sentences[i]).split(',')[0])],
                                 Sentence,
                                 queue_size=10
                                 )
